@@ -1,7 +1,10 @@
 package CoojaTopologyTester;
 
+import net.jqwik.api.*;
+import net.jqwik.api.constraints.*;
 import java.io.*;
 import java.net.*;
+import java.util.List;
 
 public class CoojaTopologyTester {
 
@@ -9,6 +12,12 @@ public class CoojaTopologyTester {
 
     // Main method to start the simulation and execute property-based tests
     public static void main(String[] args) {
+        // Run property-based tests
+        runPropertyBasedTests();
+    }
+
+    @Property(tries = 100) // run 100 different topologies
+    void testRandomTopologies(@ForAll("topologies") List<Position> positions) {
         // Start the Contiki-NG simulation in a separate thread
         Process cooja = startCoojaSimulation();
         if (cooja == null) {
@@ -30,34 +39,22 @@ public class CoojaTopologyTester {
                 InputStream inputStream = socket.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 
-                // Add a mote of type "root/sender" at position (1.0, 1.0, 0.0)
+                // Add motes to simulation at generated positions
                 String moteType = "root/sender";
-                int amountToAdd = 2;
-                double[][] positions = { {1.0, 1.0, 0.0}, {2.0, 2.0, 0.0} };
+                int amountToAdd = positions.size();
                 StringBuilder addMoteCommand = new StringBuilder("ADD_MOTE ").append(moteType).append(",");
                 addMoteCommand.append(amountToAdd).append(",");
-                for (double[] position : positions) {
-                    for (double coord : position) {
-                        addMoteCommand.append(coord).append(",");
-                    }
+                for (Position pos : positions) {
+                    addMoteCommand.append(pos.x).append(",").append(pos.y).append(",").append(pos.z).append(",");
                 }
                 addMoteCommand.deleteCharAt(addMoteCommand.length() - 1); // Remove the last comma
                 writer.println(addMoteCommand.toString());
                 String response = reader.readLine();
                 System.out.println(response);
 
-                // Start the simulation
-                writer.println("START_SIMULATION");
-                response = reader.readLine();
-                System.out.println(response);
-
-                // Stop the simulation
-                writer.println("STOP_SIMULATION");
-                response = reader.readLine();
-                System.out.println(response);
-
                 // Step the simulation
-                for (int i = 0; i < 1000; i++) {
+                int steps = 10000;
+                for (int i = 0; i < steps; i++) {
                     writer.println("STEP_SIMULATION");
                     response = reader.readLine();
                 }
@@ -79,14 +76,9 @@ public class CoojaTopologyTester {
             }
         }
 
-        // Wait for some time and then stop Cooja simulation
-        try {
-            Thread.sleep(10000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        System.out.println("Cooja finished");
+        // Terminate Cooja simulation after ensuring data collection
         cooja.destroy();
+        System.out.println("Cooja finished");
     }
 
     private static Socket waitForSocketConnection() {
@@ -120,10 +112,34 @@ public class CoojaTopologyTester {
         }
     }
 
+    @Provide
+    Arbitrary<List<Position>> topologies() {
+        return Arbitraries.integers().between(1, 10).flatMap(size -> {
+            Arbitrary<Double> coordinates = Arbitraries.doubles().between(0.0, 100.0);
+            return coordinates.array(Position.class, size).list().ofMaxSize(1);
+        });
+    }
+
+    // Helper method to run property-based tests
+    private static void runPropertyBasedTests() {
+        new CoojaTopologyTester().testSomeProperty();
+    }
+
     // Method to perform property-based tests
     private void testSomeProperty() {
         // Implement property-based tests here
         // For example:
         System.out.println("Running property-based tests...");
+    }
+
+    // Position class to store mote coordinates
+    static class Position {
+        double x, y, z;
+
+        Position(double x, double y, double z) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
     }
 }
