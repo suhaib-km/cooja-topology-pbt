@@ -1,6 +1,42 @@
-plugins{
+plugins {
     id 'java'
     id 'application'
 }
 
-mainClassName = 'CoojaTopologyTester.CoojaTopologyTester'
+repositories {
+    mavenCentral()
+}
+
+ext {
+    junitPlatformVersion = '1.10.2'
+    junitJupiterVersion = '5.10.2'
+    assertJVersion = '3.24.2'
+    jqwikVersion = '1.8.5'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs += '-parameters'
+    options.encoding = 'UTF-8'
+}
+
+test {
+    useJUnitPlatform()
+    include '**/*Properties.class'
+    include '**/*Test.class'
+    include '**/*Tests.class'
+}
+
+dependencies {
+    implementation "net.jqwik:jqwik:${jqwikVersion}"
+    implementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
+    implementation "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
+    implementation "org.jetbrains:annotations:23.0.0"
+}
+
+application {
+    mainClassName = 'CoojaTopologyTester.CoojaTopologyTester'
+}
+
+wrapper {
+    gradleVersion = '8.7'
+}
