@@ -1,30 +1,42 @@
 package CoojaTopologyTester;
 
 import net.jqwik.api.*;
-
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
+import CoojaTopologyTester.strategies.*;
+
 public class CoojaTopologyTester {
 
-    private static final int PORT = 8888; // Choose an appropriate port number
+    private static final int PORT = 8888;
+    private static final List<Seed> seeds = new ArrayList<>();
+    private MutationStrategy mutationStrategy;
 
-    public static void main(String[] args) {
-        // Perform property-based tests
-        testSomeProperty();
+    static {
+        Seed.initializeSeeds(seeds, new RandomStrategy());
     }
 
-    @Property
-    public static void testSomeProperty() {
+    @Property(tries = 1000)
+    public void testSomeProperty(@ForAll("generateSeeds") Seed seed) {
         System.out.println("Running property-based tests...");
-        Arbitraries.integers().between(2, 10).sampleStream().limit(5).forEach(nodeCount -> {
-            System.out.println("Testing with " + nodeCount + " nodes.");
-            testRadioDutyCycles(nodeCount, new ArrayList<>());
-        });
+
+        if (new Random().nextBoolean()) {
+            mutationStrategy = new RandomStrategy(); // Can randomly select among the five RandomGeneration classes
+        } else {
+            mutationStrategy = new CompleteDisplacementStrategy(); // Can randomly select among the five ExistingTopologyMutation classes
+        }
+
+        seed = mutationStrategy.mutate(seed);
+        testRadioDutyCycles(seed);
     }
 
-    public static void testRadioDutyCycles(int nodeCount, List<double[][]> previousTopologies) {
+    @Provide
+    Arbitrary<Seed> generateSeeds() {
+        return Arbitraries.of(seeds);
+    }
+
+    public void testRadioDutyCycles(Seed seed) {
         Process cooja = startCoojaSimulation();
         if (cooja == null) {
             System.out.println("Cooja could not start");
@@ -39,15 +51,10 @@ public class CoojaTopologyTester {
                 InputStream inputStream = socket.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 
-                double[][] positions;
-                if (previousTopologies.isEmpty()) {
-                    positions = generateRandomPositions(nodeCount);
-                } else {
-                    positions = generateSmartPositions(nodeCount, previousTopologies);
-                }
+                double[][] positions = seed.topology;
 
                 StringBuilder addMoteCommand = new StringBuilder("ADD_MOTE root/sender,");
-                addMoteCommand.append(nodeCount).append(",");
+                addMoteCommand.append(positions.length).append(",");
                 for (double[] position : positions) {
                     for (double coord : position) {
                         addMoteCommand.append(coord).append(",");
@@ -67,12 +74,8 @@ public class CoojaTopologyTester {
                 response = reader.readLine();
                 System.out.println("Power Statistics: " + response);
 
-                double[] powerStatistics = parsePowerStatistics(response);
-                previousTopologies.add(positions);
-
-                if (shouldRunAnotherTest(powerStatistics)) {
-                    testRadioDutyCycles(nodeCount, previousTopologies);
-                }
+                double dutyCycle = analyzePowerStatistics(response);
+                Seed.updateSeedEnergy(seed, dutyCycle);
 
             } catch (IOException e) {
                 System.err.println("Error: Failed to perform radio duty cycle test.");
@@ -123,38 +126,7 @@ public class CoojaTopologyTester {
         }
     }
 
-    private static double[][] generateRandomPositions(int nodeCount) {
-        double[][] positions = new double[nodeCount][3];
-        for (int i = 0; i < nodeCount; i++) {
-            positions[i][0] = Math.random() * 100;
-            positions[i][1] = Math.random() * 100;
-            positions[i][2] = 0.0;
-        }
-        return positions;
-    }
-
-    private static double[][] generateSmartPositions(int nodeCount, List<double[][]> previousTopologies) {
-        double[][] lastTopology = previousTopologies.get(previousTopologies.size() - 1);
-        double[][] newTopology = new double[nodeCount][3];
-        for (int i = 0; i < nodeCount; i++) {
-            newTopology[i][0] = lastTopology[i][0] + (Math.random() - 0.5) * 10;
-            newTopology[i][1] = lastTopology[i][1] + (Math.random() - 0.5) * 10;
-            newTopology[i][2] = lastTopology[i][2];
-        }
-        return newTopology;
-    }
-
-    private static double[] parsePowerStatistics(String response) {
-        String[] parts = response.split(",");
-        double[] stats = new double[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            stats[i] = Double.parseDouble(parts[i]);
-        }
-        return stats;
-    }
-
-    private static boolean shouldRunAnotherTest(double[] powerStatistics) {
-        double averagePower = Arrays.stream(powerStatistics).average().orElse(0.0);
-        return averagePower > 50.0;
+    private static double analyzePowerStatistics(String response) {
+        return Double.parseDouble(response.split(",")[0]);
     }
 }
