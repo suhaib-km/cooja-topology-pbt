@@ -1,46 +1,20 @@
 package CoojaTopologyTester;
 
-import net.jqwik.api.*;
 import java.io.*;
 import java.net.*;
-import java.util.*;
-
-import CoojaTopologyTester.strategies.*;
 
 public class CoojaTopologyTester {
 
     private static final int PORT = 8888;
-    private static final List<Seed> seeds = new ArrayList<>();
-    private MutationStrategy mutationStrategy;
 
-    static {
-        Seed.initializeSeeds(seeds, new RandomStrategy());
+    public static void main(String[] args) {
     }
 
-    @Property(tries = 1000)
-    public void testSomeProperty(@ForAll("generateSeeds") Seed seed) {
-        System.out.println("Running property-based tests...");
-
-        if (new Random().nextBoolean()) {
-            mutationStrategy = new RandomStrategy(); // Can randomly select among the five RandomGeneration classes
-        } else {
-            mutationStrategy = new CompleteDisplacementStrategy(); // Can randomly select among the five ExistingTopologyMutation classes
-        }
-
-        seed = mutationStrategy.mutate(seed);
-        testRadioDutyCycles(seed);
-    }
-
-    @Provide
-    Arbitrary<Seed> generateSeeds() {
-        return Arbitraries.of(seeds);
-    }
-
-    public void testRadioDutyCycles(Seed seed) {
+    public static double testRadioDutyCycles(Seed seed) {
         Process cooja = startCoojaSimulation();
         if (cooja == null) {
             System.out.println("Cooja could not start");
-            return;
+            return -1; // or some other error value
         }
 
         Socket socket = waitForSocketConnection();
@@ -74,12 +48,12 @@ public class CoojaTopologyTester {
                 response = reader.readLine();
                 System.out.println("Power Statistics: " + response);
 
-                double dutyCycle = analyzePowerStatistics(response);
-                Seed.updateSeedEnergy(seed, dutyCycle);
+                return analyzePowerStatistics(response);
 
             } catch (IOException e) {
                 System.err.println("Error: Failed to perform radio duty cycle test.");
                 e.printStackTrace();
+                return -1; // or some other error value
             } finally {
                 try {
                     socket.close();
@@ -96,6 +70,8 @@ public class CoojaTopologyTester {
         }
         System.out.println("Cooja finished");
         cooja.destroy();
+
+        return -1; // or some other error value
     }
 
     private static Socket waitForSocketConnection() {

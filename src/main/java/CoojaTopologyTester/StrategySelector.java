@@ -1,12 +1,27 @@
 package CoojaTopologyTester;
 
+import CoojaTopologyTester.strategies.RandomStrategy;
+import CoojaTopologyTester.strategies.CompleteDisplacementStrategy;
+
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 public class StrategySelector {
-    public static MutationStrategy selectStrategy(List<MutationStrategy> strategies) {
+    private final List<MutationStrategy> strategies;
+    private final Random random = new Random();
+
+    public StrategySelector() {
+        strategies = Arrays.asList(
+                new RandomStrategy(),
+                new CompleteDisplacementStrategy()
+                // todo: Add other strategies
+        );
+    }
+
+    public MutationStrategy selectStrategy() {
         double totalEnergy = strategies.stream().mapToDouble(MutationStrategy::getEnergy).sum();
-        double randomValue = new Random().nextDouble() * totalEnergy;
+        double randomValue = random.nextDouble() * totalEnergy;
 
         double cumulativeEnergy = 0.0;
         for (MutationStrategy strategy : strategies) {
@@ -15,6 +30,7 @@ public class StrategySelector {
                 return strategy;
             }
         }
-        return strategies.get(strategies.size() - 1);
+
+        return strategies.get(random.nextInt(strategies.size()));
     }
 }
