@@ -2,19 +2,38 @@ package CoojaTopologyTester;
 
 import java.io.*;
 import java.net.*;
+import java.util.Properties;
 
 public class CoojaTopologyTester {
 
     private static final int PORT = 8888;
+    private static String cscFilePath;
+
+    static {
+        loadConfig();
+    }
+
+    private static void loadConfig() {
+        Properties properties = new Properties();
+        try (InputStream input = new FileInputStream("config.properties")) {
+            properties.load(input);
+            cscFilePath = properties.getProperty("cscFilePath");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
 
     public static void main(String[] args) {
+        Seed seed = new Seed(new double[1][1], 0); // This should be properly initialized
+        double dutyCycle = testRadioDutyCycles(seed);
+        System.out.println("Duty Cycle: " + dutyCycle);
     }
 
     public static double testRadioDutyCycles(Seed seed) {
         Process cooja = startCoojaSimulation();
         if (cooja == null) {
             System.out.println("Cooja could not start");
-            return -1; // or some other error value
+            return -1;
         }
 
         Socket socket = waitForSocketConnection();
@@ -24,6 +43,11 @@ public class CoojaTopologyTester {
                 PrintWriter writer = new PrintWriter(outputStream, true);
                 InputStream inputStream = socket.getInputStream();
                 BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+
+                // Send the .csc file path to the control plugin
+                writer.println("LOAD_CSC " + cscFilePath);
+                String response = reader.readLine();
+                System.out.println(response);
 
                 double[][] positions = seed.topology;
 
@@ -36,7 +60,7 @@ public class CoojaTopologyTester {
                 }
                 addMoteCommand.deleteCharAt(addMoteCommand.length() - 1);
                 writer.println(addMoteCommand.toString());
-                String response = reader.readLine();
+                response = reader.readLine();
                 System.out.println(response);
 
                 for (int i = 0; i < 10000; i++) {
