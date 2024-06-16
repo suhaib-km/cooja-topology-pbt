@@ -36,8 +36,14 @@ dependencies {
     testImplementation "net.jqwik:jqwik:${jqwikVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter-api:${junitJupiterVersion}"
     testImplementation "org.junit.jupiter:junit-jupiter-engine:${junitJupiterVersion}"
-    testImplementation "org.jetbrains:annotations:23.0.0"
     testImplementation "org.assertj:assertj-core:${assertJVersion}"
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        showStandardStreams = true
+    }
 }
 
 application {

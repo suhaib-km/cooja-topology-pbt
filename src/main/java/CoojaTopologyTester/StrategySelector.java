@@ -2,6 +2,9 @@ package CoojaTopologyTester;
 
 import CoojaTopologyTester.strategies.RandomStrategy;
 import CoojaTopologyTester.strategies.CompleteDisplacementStrategy;
+import CoojaTopologyTester.strategies.SingleNodeDisplacementStrategy;
+import CoojaTopologyTester.strategies.ClusteredRandomStrategy;
+import CoojaTopologyTester.strategies.SwapNodePositionsStrategy;
 
 import java.util.Arrays;
 import java.util.List;
@@ -14,8 +17,10 @@ public class StrategySelector {
     public StrategySelector() {
         strategies = Arrays.asList(
                 new RandomStrategy(),
-                new CompleteDisplacementStrategy()
-                // todo: Add other strategies
+                new CompleteDisplacementStrategy(),
+                new ClusteredRandomStrategy(),
+                new SingleNodeDisplacementStrategy(),
+                new SwapNodePositionsStrategy()
         );
     }
 

@@ -4,19 +4,24 @@ import java.util.List;
 import java.util.Random;
 
 public class Seed {
-    double[][] topology;
+    Node[] topology;
     double energy;
     public static final int INITIAL_ENERGY = 100;
     public static final int MAX_SEEDS = 10;
 
-    public Seed(double[][] topology, double energy) {
+    public Seed(Node[] topology, double energy) {
         this.topology = topology;
         this.energy = energy;
     }
 
-    static void initializeSeeds(List<Seed> seeds, MutationStrategy strategy) {
+    static void initializeSeeds(List<Seed> seeds, MutationStrategy strategy, List<Invariant> invariants) {
         for (int i = 0; i < MAX_SEEDS; i++) {
-            seeds.add(strategy.mutate(new Seed(new double[5][3], INITIAL_ENERGY)));
+            Node[] nodes = new Node[10];
+            for (int j = 0; j < nodes.length; j++)
+            {
+                nodes[j] = new Node(new double[3], "");
+            }
+            seeds.add(strategy.mutate(new Seed(nodes, INITIAL_ENERGY), invariants));
         }
     }
 
@@ -32,6 +37,16 @@ public class Seed {
         }
         return seeds.get(seeds.size() - 1);
     }
+   
+    public static void normaliseEnergy(List<Seed> seeds) {
+        double maxEnergy = seeds.stream()
+                               .mapToDouble(Seed::getEnergy)
+                               .max()
+                               .orElse(1.0);
+
+        seeds.forEach(seed -> seed.setEnergy(seed.getEnergy() / maxEnergy));
+    }
+
 
     static void updateSeedEnergy(Seed seed, double dutyCycle) {
         double targetDutyCycle = 0.5;
@@ -39,7 +54,7 @@ public class Seed {
         seed.energy += energyAdjustment;
     }
 
-    public double[][] getTopology()
+    public Node[] getTopology()
     {
         return topology;
     }
@@ -47,5 +62,10 @@ public class Seed {
     public double getEnergy()
     {
         return energy;
+    }
+
+    public void setEnergy(double newEnergy)
+    {
+        this.energy = newEnergy;
     }
 }
