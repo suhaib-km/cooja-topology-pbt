@@ -12,7 +12,7 @@ public class CoojaTopologyTest {
 
     private static final List<Seed> seeds = new ArrayList<>();
     private final StrategySelector strategySelector = new StrategySelector();
-    private static final double TARGET_DUTY_CYCLE = 0.017; // Define your target duty cycle boundary here
+    private static final double TARGET_DUTY_CYCLE = 0.02;
     private static final String CONFIG_FILE = "config.properties";
     
     private double previousHighestDutyCycle = Double.POSITIVE_INFINITY;

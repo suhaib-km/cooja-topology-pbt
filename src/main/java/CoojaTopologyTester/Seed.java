@@ -7,7 +7,7 @@ public class Seed {
     Node[] topology;
     double energy;
     public static final int INITIAL_ENERGY = 100;
-    public static final int MAX_SEEDS = 10;
+    public static final int MAX_SEEDS = 1;
 
     public Seed(Node[] topology, double energy) {
         this.topology = topology;

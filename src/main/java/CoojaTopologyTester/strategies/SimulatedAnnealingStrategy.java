@@ -7,73 +7,71 @@ import CoojaTopologyTester.MutationStrategy;
 import CoojaTopologyTester.ConfigLoader;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 public class SimulatedAnnealingStrategy extends MutationStrategy {
-    private final double initialTemperature;
+    private static final int MAX_NODES = 20;
     private final double coolingRate;
+    private double currentTemperature;
+    private Seed currentSeed;
+    private Seed bestSeed;
+    private double bestEnergy;
     private final Random rand = new Random();
 
     public SimulatedAnnealingStrategy(double initialTemperature, double coolingRate) {
-        this.initialTemperature = initialTemperature;
         this.coolingRate = coolingRate;
+        this.currentTemperature = initialTemperature;
     }
 
     @Override
     public Seed mutate(Seed seed, List<Invariant> invariants) {
-        double temperature = initialTemperature;
-        Seed currentSeed = seed;
-        Seed bestSeed = seed;
-
-        while (temperature > 1) {
-            Seed newSeed = getNeighbour(currentSeed, temperature);
-
-            if (checkInvariants(newSeed.getTopology(), invariants)) {
-                double currentEnergy = currentSeed.getEnergy();
-                double newEnergy = newSeed.getEnergy();
-
-                if (acceptanceProbability(currentEnergy, newEnergy, temperature) > rand.nextDouble()) {
-                    currentSeed = newSeed;
-                }
-
-                if (newEnergy < bestSeed.getEnergy()) {
-                    bestSeed = newSeed;
-                }
-            }
-
-            temperature *= 1 - coolingRate;
+        if (currentSeed == null) {
+            currentSeed = seed;
+            bestSeed = seed;
+            bestEnergy = seed.getEnergy();
         }
 
-        return bestSeed;
+        Seed newSeed = getNeighbour(currentSeed, currentTemperature);
+
+        if (checkInvariants(newSeed.getTopology(), invariants)) {
+            double newEnergy = newSeed.getEnergy();
+
+            if (acceptanceProbability(currentSeed.getEnergy(), newEnergy, currentTemperature) > rand.nextDouble()) {
+                currentSeed = newSeed;
+            }
+
+            if (newEnergy < bestEnergy) {
+                bestSeed = newSeed;
+                bestEnergy = newEnergy;
+            }
+        }
+
+        currentTemperature *= 1 - coolingRate;
+
+        return currentSeed;
     }
 
     private Seed getNeighbour(Seed seed, double temperature) {
         Node[] nodes = seed.getTopology();
-        List<int[]> edges = new ArrayList<>();  // Assuming you have a way to get edges from the seed
-        int newSize = tinteger(nodes.length, temperature);
+        int newSize = Math.min(MAX_NODES, tinteger(nodes.length, temperature));
 
         int[] ops = getOpCount(newSize, nodes.length, temperature);
-        int adds = ops[0];
-        int dels = ops[1];
+        int adds = Math.min(ops[0], MAX_NODES - nodes.length); 
+        int dels = Math.max(ops[1], 0); 
 
-        Node[] newNodes = addNodes(nodes, adds, temperature);
+        Node[] newNodes = addNodes(nodes, adds);
         Node[] finalNodes = delNodes(newNodes, dels);
 
-        int newEdgeSize = tinteger(edges.size(), temperature);
-        int[] edgeOps = getOpCount(newEdgeSize, edges.size(), temperature);
-        int edgeAdds = edgeOps[0];
-        int edgeDels = edgeOps[1];
-
-        List<int[]> newEdges = addEdges(finalNodes, edges, edgeAdds);
-        List<int[]> finalEdges = delEdges(newEdges, edgeDels);
-
-        return new Seed(finalNodes, seed.getEnergy())); // Adjust energy calculation as needed
+        return new Seed(finalNodes, seed.getEnergy());
     }
 
     private int tinteger(int base, double temperature) {
-        int offset = (int) (0.5 * base * temperature) + 1;
-        return rand.nextInt((base + offset) - (base - offset) + 1) + (base - offset);
+        int offset = (int) (0.5 * Math.max(base, 1) * temperature) + 1;
+        int min = Math.max(1, base - offset);
+        int max = Math.max(min + 1, base + offset); 
+        return rand.nextInt(max - min) + min; 
     }
 
     private int[] getOpCount(int newSize, int oldSize, double temperature) {
@@ -82,8 +80,8 @@ public class SimulatedAnnealingStrategy extends MutationStrategy {
         return new int[]{adds, dels};
     }
 
-    private Node[] addNodes(Node[] nodes, int count, double temperature) {
-        List<Node> newNodes = new ArrayList<>(List.of(nodes));
+    private Node[] addNodes(Node[] nodes, int count) {
+        List<Node> newNodes = new ArrayList<>(Arrays.asList(nodes));
         for (int i = 0; i < count; i++) {
             double[] position = {rand.nextDouble(), rand.nextDouble(), rand.nextDouble()};
             newNodes.add(new Node(position, getRandomNodeType(ConfigLoader.moteTypes)));
@@ -92,31 +90,11 @@ public class SimulatedAnnealingStrategy extends MutationStrategy {
     }
 
     private Node[] delNodes(Node[] nodes, int count) {
-        List<Node> newNodes = new ArrayList<>(List.of(nodes));
-        for (int i = 0; i < count && !newNodes.isEmpty(); i++) {
-            newNodes.remove(rand.nextInt(newNodes.size()));
+        List<Node> newNodes = new ArrayList<>(Arrays.asList(nodes));
+        for (int i = 0; i < count && newNodes.size() > 1; i++) { 
+            newNodes.remove(rand.nextInt(newNodes.size())); 
         }
         return newNodes.toArray(new Node[0]);
-    }
-
-    private List<int[]> addEdges(Node[] nodes, List<int[]> edges, int count) {
-        List<int[]> newEdges = new ArrayList<>(edges);
-        for (int i = 0; i < count; i++) {
-            int n1 = rand.nextInt(nodes.length);
-            int n2 = rand.nextInt(nodes.length);
-            if (n1 != n2) {
-                newEdges.add(new int[]{n1, n2});
-            }
-        }
-        return newEdges;
-    }
-
-    private List<int[]> delEdges(List<int[]> edges, int count) {
-        List<int[]> newEdges = new ArrayList<>(edges);
-        for (int i = 0; i < count && !newEdges.isEmpty(); i++) {
-            newEdges.remove(rand.nextInt(newEdges.size()));
-        }
-        return newEdges;
     }
 
     private double acceptanceProbability(double currentEnergy, double newEnergy, double temperature) {
@@ -137,5 +115,9 @@ public class SimulatedAnnealingStrategy extends MutationStrategy {
 
     private String getRandomNodeType(List<String> nodeTypes) {
         return nodeTypes.get(rand.nextInt(nodeTypes.size()));
+    }
+
+    public Seed getBestSeed() {
+        return bestSeed;
     }
 }
